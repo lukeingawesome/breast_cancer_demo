@@ -1,0 +1,54 @@
+name: ci-cd-medical-model
+
+on:
+  push:           # every commit & PR
+    branches: [main]
+  pull_request:
+  schedule:       # nightly retrain at 02:30 UTC
+    - cron: '30 2 * * *'
+  workflow_dispatch:  # manual button
+
+permissions:
+  contents: write       # allow committing artefacts (optional)
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+    - uses: actions/checkout@v4
+
+    # 1️⃣ Python + dependency cache
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    - run: pip install -r requirements.txt
+
+    # 2️⃣ Unit tests
+    - run: pytest -q
+
+    # 3️⃣ Train + show metrics
+    - run: python -m src.train
+
+    # 4️⃣ Upload artefacts for inspection (90‑day default retention)
+    - uses: actions/upload-artifact@v4
+      with:
+        name: model-${{ github.run_number }}
+        path: |
+          models/
+          */metrics.json
+
+    # 5️⃣ OPTIONAL – commit the newest model back to repo
+    - name: Commit model
+      if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+      run: |
+        git config user.name  "github-actions"
+        git config user.email "actions@users.noreply.github.com"
+        git add models
+        git commit -m "Auto‑update model ${{ github.run_number }}" || echo "nothing to commit"
+        git push
