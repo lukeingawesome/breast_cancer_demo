@@ -10,7 +10,7 @@ from sklearn.datasets import load_breast_cancer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, roc_auc_score
 from sklearn.model_selection import train_test_split
-from model_utils import seed_everything
+from .model_utils import seed_everything
 
 def main(cfg):
     seed_everything(cfg["seed"])
